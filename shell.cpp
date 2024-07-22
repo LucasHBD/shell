@@ -2,11 +2,23 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+using namespace std;
+
+int ls(){
+    const char *command = "ls";
+    char *args[] = {const_cast<char*>(command), NULL};
+
+    if(execvp("ls", args) == -1){
+        cerr << "execvp" << endl;
+        exit(EXIT_FAILURE);
+    }
+    return 0;
+}
+
 void process_command(std::string command) {
-    // Se for comando interno...
     if (command == "exit")
         exit(0);
-
+    else if(command == "ls") ls();
     // Se for comando externo
 
     // * necessário verificar se é para ser executado em background

@@ -1,51 +1,83 @@
-#include <iostream>
-#include <unistd.h>
-#include <sys/wait.h>
+#include <iostream>     
+#include <unistd.h>     
+#include <sys/wait.h>   
+#include <vector>       
+#include <cstring>
 
 using namespace std;
 
-int ls(){
-    const char *command = "ls";
-    char *args[] = {const_cast<char*>(command), NULL};
+#define HISTORY_SIZE 10
+std::vector<std::string> history;
 
-    if(execvp("ls", args) == -1){
-        cerr << "execvp" << endl;
-        exit(EXIT_FAILURE);
+void record_command(const string &command){
+    if(history.size() < HISTORY_SIZE) history.pushback(command);
+    else{
+        history.erase(history.begin());
+        history.pushback(command);
     }
-    return 0;
 }
 
-void process_command(std::string command) {
+void show_history(){
+    for(size_t i = 0; i < history.size(); i++){
+        cout << i << " " << history[i] << endl;
+    }
+}
+
+void process_command(const std::string &command_line) {
+    record_command(command_line);
+
+    char *command_cstr = new char[command_line.size() + 1];
+    strcpy(command_cstr, command_line.c_str());
+
+    char *token = strtok(command_cstr, " ");
+    if(!token){
+        delete[] command_cstr;
+        return;
+    }
+    string command = token;
+    vector<char*> args;
+    args.pushback(token);
+
+    while((token = strtok(NULL, " ")) != NULL){
+        args.pushback(token);
+    }
+    args.pushback(NULL);
+    delete[] command_cstr;
+
     if (command == "exit")
         exit(0);
-    else if(command == "ls") ls();
-    // Se for comando externo
+    else if(command == "history"){
+        show_history();
+        return;
+    }
+   
+    vector<string> directories = {"./commands", "/bin", "/user/bin", "user/local/bin"};
+    bool command_found = false;
 
-    // * necessário verificar se é para ser executado em background
-    /*  Se for caminho relativo, procurar o comando na lista de diretórios
-        Se for absoluto verifica se comando existe
-    */
-    std::string absolute_path = "/bin/" + command; 
-    if (access(absolute_path.c_str(), F_OK) == 0) { // Arquivo existe no diretório
-        if (access(absolute_path.c_str(), X_OK) == 0) { // Arquivo é executável
+    for(const string &dir : directories){
+        string absolute_path = dir + "/" + command;
+        if(access(absolute_path.c_str(), X_OK) == 0){
             pid_t pid = fork();
-            if (pid < 0){ // Erro
-                std::cout << "Erro de execução!" << std::endl;
+            if(pid < 0){
+                cout << "Erro de execução!" << endl;
                 return;
-            } else if (pid == 0){ //processo filho
-                char * argv[2] = {(char *)command.c_str(), nullptr};
-                execve(absolute_path.c_str(), argv, NULL);
-            } else { // Processo pai
-                /* Deve adicionar processo filho na lista (std::vector) 
-                   de processos em execução para gerenciar background. */
-                /* Processo pai espera processo filho terminar. */
-                waitpid(pid, nullptr, 0); 
+            } else if(pid == 0){
+                execve(absolute_path.c_str(), args.data(), NULL);
+                cerr << "execve" << endl;
+                exit(EXIT_FAILURE);
+            } else {
+                witpid(pid, nullptr, 0);
             }
-        } else { // Arquivo não é executável
-            std::cout << "permission denied: " << command << std::endl;
+            command_found = true;
+            break;
+        } else {
+            cout << "Permissão Negada: " << command << endl;
+            command_found = true;
+            break
         }
-    } else { // Arquivo não existe
-        std::cout << "Command not found: " << command << std::endl;
+    } 
+    if(!command_found){
+        cout << "Comando nao encontrado: " << command << endl;
     }
 }
 
